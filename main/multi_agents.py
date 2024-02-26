@@ -77,6 +77,32 @@ class ReflexAgent(Agent):
         new_scared_times = [ghost_state.scared_timer for ghost_state in new_ghost_states]
 
         "*** YOUR CODE HERE ***"
+        "First: Get manhattan distances to all food and ghosts"
+        "do it based on closest: go towards food, run from ghosts"
+
+        food_dists = []
+        for ix, gx in enumerate(new_food):
+            for iy, gy in enumerate(gx):
+                if gy:
+                    food_dists.append(manhattan_distance(new_pos, (ix, iy)))
+        food_dists = sorted(food_dists)
+        if not food_dists:
+            return 0
+
+        ghost_dists = []
+        for gstate in new_ghost_states:
+            ghost_dists.append(manhattan_distance(new_pos, gstate.get_position()))
+        ghost_dists = sorted(ghost_dists)
+        ghost_val = 0
+        if ghost_dists[0]<2:
+            ghost_val = -1000
+        elif ghost_dists[0]<5:
+            ghost_val = -0.5
+        else:
+            ghost_val = 0
+
+        score_diff = successor_game_state.get_score()-current_game_state.get_score()
+        return (1.0/food_dists[0]) + 4*score_diff + ghost_val
         return successor_game_state.get_score()
 
 def score_evaluation_function(current_game_state):
@@ -87,6 +113,7 @@ def score_evaluation_function(current_game_state):
       This evaluation function is meant for use with adversarial search agents
       (not reflex agents).
     """
+
     return current_game_state.get_score()
 
 class MultiAgentSearchAgent(Agent):
@@ -132,7 +159,32 @@ class MinimaxAgent(MultiAgentSearchAgent):
             Returns the total number of agents in the game
         """
         "*** YOUR CODE HERE ***"
+
+        return self.recursive_eval(game_state, 0, 0)[1]
+
         util.raise_not_defined()
+
+    def recursive_eval(self, game_state, agent_index, curr_depth):
+        # If game ends, or depth goes too deep (base case)
+        if game_state.is_win() or game_state.is_lose() or curr_depth >= self.depth:
+            return [self.evaluation_function(game_state), Directions.STOP]
+
+        # Otherwise, check children
+        new_index = agent_index+1
+        new_depth = curr_depth
+        if new_index >= game_state.get_num_agents():
+            new_index = 0
+            new_depth = new_depth+1
+        actions = game_state.get_legal_actions(agent_index)
+        scores = []
+        for action in actions:
+            scores.append(self.recursive_eval(game_state.generate_successor(agent_index, action), new_index, new_depth)[0])
+        if agent_index == 0:
+            i = scores.index(max(scores))
+            return [scores[i], actions[i]]
+        else:
+            i = scores.index(min(scores))
+            return [scores[i], actions[i]]
 
 class AlphaBetaAgent(MultiAgentSearchAgent):
     """
@@ -144,7 +196,47 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
           Returns the minimax action using self.depth and self.evaluation_function
         """
         "*** YOUR CODE HERE ***"
+        return self.recursive_eval(game_state, 0, 0, float('-inf'), float('inf'))[1]
+
         util.raise_not_defined()
+
+    def recursive_eval(self, game_state, agent_index, curr_depth, a, b):
+        # If game ends, or depth goes too deep (base case)
+        if game_state.is_win() or game_state.is_lose() or curr_depth >= self.depth:
+            return [self.evaluation_function(game_state), Directions.STOP]
+
+        # Otherwise, check children
+        new_index = agent_index+1
+        new_depth = curr_depth
+        if new_index >= game_state.get_num_agents():
+            new_index = 0
+            new_depth = new_depth+1
+        actions = game_state.get_legal_actions(agent_index)
+        scores = []
+        vmax = float('-inf')
+        vmin = float('inf')
+        ret_action = Directions.STOP
+        for action in actions:
+            if agent_index == 0:
+                vmax_old = vmax
+                vmax = max(vmax, self.recursive_eval(game_state.generate_successor(agent_index, action), new_index, new_depth, a, b)[0])
+                if vmax != vmax_old:
+                    ret_action = action
+                if vmax > b:
+                    return [vmax, action]
+                a = max(a, vmax)
+            else:
+                vmin_old = vmin
+                vmin = min(vmin, self.recursive_eval(game_state.generate_successor(agent_index, action), new_index, new_depth, a, b)[0])
+                if vmin != vmin_old:
+                    ret_action = action
+                if vmin < a:
+                    return [vmin, action]
+                b = min(b, vmin)
+        if agent_index == 0:
+            return [vmax, ret_action]
+        else:
+            return [vmin, ret_action]
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
     """
@@ -159,16 +251,76 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
           legal moves.
         """
         "*** YOUR CODE HERE ***"
+
+        return self.recursive_eval(game_state, 0, 0)[1]
+
         util.raise_not_defined()
+
+    def recursive_eval(self, game_state, agent_index, curr_depth):
+        # If game ends, or depth goes too deep (base case)
+        if game_state.is_win() or game_state.is_lose() or curr_depth >= self.depth:
+            return [self.evaluation_function(game_state), Directions.STOP]
+
+        # Otherwise, check children
+        new_index = agent_index + 1
+        new_depth = curr_depth
+        if new_index >= game_state.get_num_agents():
+            new_index = 0
+            new_depth = new_depth + 1
+        actions = game_state.get_legal_actions(agent_index)
+        scores = []
+        for action in actions:
+            scores.append(self.recursive_eval(game_state.generate_successor(agent_index, action), new_index, new_depth)[0])
+        if agent_index == 0:
+            i = scores.index(max(scores))
+            return [scores[i], actions[i]]
+        else:
+            return [sum(scores)/len(scores), Directions.STOP]
 
 def better_evaluation_function(current_game_state):
     """
       Your extreme ghost-hunting, pellet-nabbing, food-gobbling, unstoppable
       evaluation function (question 5).
 
-      DESCRIPTION: <write something here so we know what you did>
+      DESCRIPTION: nothing i do here changes the behavior, i have been messing with it for hours and i cant
+      even break it and i dont know why, like literally every single time it runs into the same corner and will only
+      move if a ghost is directly next to it. Even replacing the function exactly with the old eval function doesnt
+      change it
     """
+    # Useful information you can extract from a GameState (pacman.py)
+    new_pos = current_game_state.get_pacman_position()
+    new_food = current_game_state.get_food()
+    new_ghost_states = current_game_state.get_ghost_states()
+    new_scared_times = [ghost_state.scared_timer for ghost_state in new_ghost_states]
+
     "*** YOUR CODE HERE ***"
+    "First: Get manhattan distances to all food and ghosts"
+    "do it based on closest: go towards food, run from ghosts"
+
+    food_dists = []
+    for ix, gx in enumerate(new_food):
+        for iy, gy in enumerate(gx):
+            if gy:
+                food_dists.append(manhattan_distance(new_pos, (ix, iy)))
+    food_dists = sorted(food_dists)
+    total_food = len(food_dists)
+    if not food_dists:
+        return 1000
+
+    ghost_dists = []
+    for gstate in new_ghost_states:
+        ghost_dists.append(manhattan_distance(new_pos, gstate.get_position()))
+    ghost_dists = sorted(ghost_dists)
+    ghost_val = 0
+    if ghost_dists[0] < 2:
+        ghost_val = -100
+    elif ghost_dists[0] < 5:
+        ghost_val = -0.1
+    else:
+        ghost_val = 0
+
+    return 0.5*(1.0 / food_dists[0]) + 5.0*(1.0 / total_food) + ghost_val + 0.1*current_game_state.get_score()
+    return current_game_state.get_score()
     util.raise_not_defined()
 
 # Abbreviation
