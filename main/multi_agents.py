@@ -286,6 +286,8 @@ def better_evaluation_function(current_game_state):
       even break it and i dont know why, like literally every single time it runs into the same corner and will only
       move if a ghost is directly next to it. Even replacing the function exactly with the old eval function doesnt
       change it
+
+      edit: nevermind i figured it out, im dumb
     """
     # Useful information you can extract from a GameState (pacman.py)
     new_pos = current_game_state.get_pacman_position()
